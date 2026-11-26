@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>DoNotTryAccessibility</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="topbar-text">
+      <h1>DoNotTryAccessibility</h1>
+      <p>Zygisk 版 · 无需 LSPosed</p>
+    </div>
+    <span id="status-pill" class="pill pill-off">检测中</span>
+  </header>
+
+  <main>
+    <section class="card status-card" id="status-card">
+      <div class="status-row">
+        <div>
+          <div class="status-title" id="status-title">正在读取模块状态…</div>
+          <div class="status-detail" id="status-detail"></div>
+        </div>
+      </div>
+      <div class="status-hint">
+        安装模块、启用 Zygisk 并重启后生效。日志：<code>adb logcat -s DNTA-Zygisk</code>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>防护开关</h2>
+
+      <label class="switch-row">
+        <span>
+          <strong>总开关</strong>
+          <small>关闭后所有钩子立即放行</small>
+        </span>
+        <input type="checkbox" id="sw-enabled">
+      </label>
+
+      <label class="switch-row">
+        <span>
+          <strong>隐藏无障碍状态</strong>
+          <small>让目标应用认为没有开启无障碍服务</small>
+        </span>
+        <input type="checkbox" id="sw-accessibility">
+      </label>
+
+      <label class="switch-row">
+        <span>
+          <strong>隐藏 USB 调试状态</strong>
+          <small>伪造 adb_enabled / adb_wifi_enabled / development_settings_enabled</small>
+        </span>
+        <input type="checkbox" id="sw-adb">
+      </label>
+
+      <label class="switch-row">
+        <span>
+          <strong>自动填充新安装的包名</strong>
+          <small>第一次开启时记录基线；之后新安装的用户应用自动加入并拦截，已存在的应用不处理，同批新装只取最新安装的一个</small>
+        </span>
+        <input type="checkbox" id="sw-auto">
+      </label>
+
+      <p class="hint" id="auto-hint"></p>
+    </section>
+
+    <section class="card">
+      <div class="list-head">
+        <h2>应用列表</h2>
+        <span class="count" id="list-count"></span>
+      </div>
+
+      <input id="search" type="search" placeholder="搜索应用名或包名" autocomplete="off">
+      <div class="chips" id="chips">
+        <button class="chip active" data-filter="all">全部</button>
+        <button class="chip" data-filter="blocked">已拦截</button>
+        <button class="chip" data-filter="user">用户应用</button>
+        <button class="chip" data-filter="system">系统应用</button>
+      </div>
+
+      <ul id="package-list" class="package-list"></ul>
+      <div id="list-empty" class="empty" hidden>没有匹配的应用</div>
+      <div id="list-loading" class="empty">正在读取应用列表…</div>
+    </section>
+
+    <section class="card">
+      <h2>自动填充记录</h2>
+      <p class="hint" id="auto-list"></p>
+      <button id="btn-clear-auto" class="btn">清空自动填充记录</button>
+    </section>
+
+    <footer class="footer">
+      <p>勾选 = 拦截并伪造状态；取消勾选 = 加入白名单，自动填充不会再加入。</p>
+      <p>配置保存在 <code>Settings.Global → dnta_config</code>，无需额外 App。</p>
+    </footer>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

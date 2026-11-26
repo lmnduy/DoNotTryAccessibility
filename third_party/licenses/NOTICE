@@ -1,0 +1,17 @@
+This project contains third-party code:
+
+1. Pine (https://github.com/canyie/pine)
+   Copyright (c) canyie
+   Licensed under the Anti-996 License.
+   The Java API (top.canyie.pine.*) and the ART hooking core (native/pine/*)
+   are copied from the Pine project and linked into the Zygisk library.
+
+2. Zygisk API header (native/zygisk/zygisk.hpp)
+   Copyright 2022-2023 John "topjohnwu" Wu
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted.
+
+3. Original DoNotTryAccessibility project
+   https://github.com/Nitsuya/DoNotTryAccessibility
+   Licensed under GPL-3.0. The hook target list and overall idea are derived
+   from it.
