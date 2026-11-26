@@ -43,8 +43,10 @@ public final class HookInstaller {
     private HookInstaller() {
     }
 
-    public static void install() {
-        ClassLoader loader = HookInstaller.class.getClassLoader();
+    public static void install(ClassLoader loader) {
+        if (loader == null) {
+            loader = HookInstaller.class.getClassLoader();
+        }
         installAccessibilityManagerService(loader);
         installContentProviderTransport(loader);
     }

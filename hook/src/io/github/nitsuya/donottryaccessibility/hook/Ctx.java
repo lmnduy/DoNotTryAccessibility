@@ -2,16 +2,18 @@ package io.github.nitsuya.donottryaccessibility.hook;
 
 import android.content.Context;
 import android.os.SystemClock;
+import android.provider.Settings;
 
 import java.lang.reflect.Method;
 
 /**
- * Lazily resolves the system {@link Context} inside {@code system_server}.
+ * Resolves the system {@link Context} inside {@code system_server}.
  *
- * <p>The hook is installed from {@code postServerSpecialize}, which runs before
- * {@code ActivityThread.systemMain()}; therefore the context is not available
- * immediately.  A small daemon thread polls until it shows up and then writes
- * the initial status heartbeat.</p>
+ * <p>The Zygisk server hook runs before {@code ActivityThread.systemMain()};
+ * the content providers and the services class loader are not ready at that
+ * point.  {@link #awaitSystemReady()} waits until the settings provider can be
+ * queried and {@code AccessibilityManagerService} is loadable, then caches the
+ * context for all later hooks.</p>
  */
 public final class Ctx {
 
@@ -21,15 +23,38 @@ public final class Ctx {
     }
 
     public static Context get() {
-        Context cached = sContext;
-        if (cached != null) {
-            return cached;
+        return sContext;
+    }
+
+    public static ClassLoader systemClassLoader() {
+        Context context = sContext;
+        return context == null ? null : context.getClassLoader();
+    }
+
+    public static Context awaitSystemReady() {
+        for (int i = 0; i < 1200; i++) {
+            Context context = resolve();
+            if (context != null && isReady(context)) {
+                sContext = context;
+                return context;
+            }
+            SystemClock.sleep(250);
         }
-        Context resolved = resolve();
-        if (resolved != null) {
-            sContext = resolved;
+        return null;
+    }
+
+    private static boolean isReady(Context context) {
+        try {
+            // SettingsProvider is one of the first providers; if it answers,
+            // system_server is far enough along for our hooks and heartbeat.
+            Settings.Global.getInt(context.getContentResolver(), "boot_count", -1);
+            // services.jar must be visible through the system class loader.
+            Class.forName("com.android.server.accessibility.AccessibilityManagerService",
+                    false, context.getClassLoader());
+            return true;
+        } catch (Throwable t) {
+            return false;
         }
-        return resolved;
     }
 
     private static Context resolve() {
@@ -72,30 +97,5 @@ public final class Ctx {
         } catch (Throwable ignored) {
         }
         return null;
-    }
-
-    public static void startPolling() {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                for (int i = 0; i < 1200; i++) {
-                    if (get() != null) {
-                        break;
-                    }
-                    SystemClock.sleep(100);
-                }
-                Context context = get();
-                if (context == null) {
-                    Logx.w("system context never appeared, auto-fill persistence disabled");
-                    return;
-                }
-                Logx.i("system context ready");
-                Status.write();
-                Config.get();
-                AutoFill.registerObservers();
-            }
-        }, "dnta-ctx");
-        thread.setDaemon(true);
-        thread.start();
     }
 }

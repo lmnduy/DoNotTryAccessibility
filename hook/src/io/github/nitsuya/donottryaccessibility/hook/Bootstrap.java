@@ -1,5 +1,7 @@
 package io.github.nitsuya.donottryaccessibility.hook;
 
+import android.content.Context;
+
 import top.canyie.pine.Pine;
 import top.canyie.pine.PineConfig;
 
@@ -13,8 +15,10 @@ public final class Bootstrap {
     }
 
     /**
-     * Called from {@code nativeInit()} in {@code libdnta.so}.
-     * Must never throw, otherwise system_server would abort.
+     * Called from {@code nativeInit()} in {@code libdnta.so}.  Pine is
+     * initialized immediately, but the hooks are installed only after
+     * system_server is ready: at {@code postServerSpecialize} time the settings
+     * provider and services.jar classes do not exist yet.
      */
     public static void start() {
         try {
@@ -32,10 +36,30 @@ public final class Bootstrap {
             };
             Pine.ensureInitialized();
             Logx.i("bootstrap: Pine initialized (hook mode " + Pine.getHookMode() + ")");
-            HookInstaller.install();
-            Config.startObserver();
-            Ctx.startPolling();
-            Logx.i("bootstrap: done");
+
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Context context = Ctx.awaitSystemReady();
+                        if (context == null) {
+                            Logx.e("bootstrap: system_server never became ready", null);
+                            return;
+                        }
+                        Logx.i("bootstrap: system_server ready, installing hooks");
+                        HookInstaller.install(context.getClassLoader());
+                        Config.startObserver();
+                        AutoFill.registerObservers();
+                        Status.write();
+                        Status.writeAfterBootCompleted();
+                        Logx.i("bootstrap: done");
+                    } catch (Throwable t) {
+                        Logx.e("bootstrap: deferred init failed", t);
+                    }
+                }
+            }, "dnta-bootstrap");
+            thread.setDaemon(true);
+            thread.start();
         } catch (Throwable t) {
             Logx.e("bootstrap failed", t);
         }

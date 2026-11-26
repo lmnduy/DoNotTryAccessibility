@@ -1,14 +1,29 @@
 #include <jni.h>
 #include <android/log.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 
 #include "zygisk.hpp"
 
 #define LOG_TAG "DNTA-Zygisk"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+namespace {
+
+void mark(const char *stage) {
+    int fd = open("/data/system/dnta_hook.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fd >= 0) {
+        dprintf(fd, "%s (pid %d)\n", stage, getpid());
+        close(fd);
+    }
+}
+
+}  // namespace
 
 extern "C" {
 bool register_Pine(JNIEnv *env, jclass clazz);
@@ -114,42 +129,53 @@ bool init(JNIEnv *env) {
     if (gInjected) {
         return true;
     }
+    mark("init-start");
     LOGI("injecting into system_server (dex %u bytes)", dnta_dex_len);
 
     jobject loader = createDexLoader(env);
     if (loader == nullptr) {
         LOGE("cannot create the dex class loader");
+        mark("init-fail-loader");
         return false;
     }
     gDexLoader = env->NewGlobalRef(loader);
+    mark("init-loader-ok");
 
     jclass pineClass = loadClass(env, loader, kPineClass);
     jclass rulerClass = loadClass(env, loader, kRulerClass);
     if (pineClass == nullptr || rulerClass == nullptr) {
         LOGE("cannot load Pine classes");
+        mark("init-fail-pine-class");
         return false;
     }
     if (!register_Pine(env, pineClass) || !register_Ruler(env, rulerClass)) {
         LOGE("cannot register Pine native methods");
+        mark("init-fail-pine-register");
         return false;
     }
+    mark("init-pine-ok");
 
     jclass bootstrapClass = loadClass(env, loader, kBootstrapClass);
     if (bootstrapClass == nullptr) {
         LOGE("cannot load Bootstrap");
+        mark("init-fail-bootstrap-class");
         return false;
     }
     jmethodID start = env->GetStaticMethodID(bootstrapClass, "start", "()V");
     if (start == nullptr) {
         clearException(env, "GetStaticMethodID(Bootstrap.start)");
+        mark("init-fail-bootstrap-method");
         return false;
     }
+    mark("init-calling-bootstrap");
     env->CallStaticVoidMethod(bootstrapClass, start);
     if (clearException(env, "Bootstrap.start")) {
+        mark("init-fail-bootstrap-exception");
         return false;
     }
 
     gInjected = true;
+    mark("init-ok");
     LOGI("injection finished");
     return true;
 }
@@ -174,8 +200,10 @@ public:
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *args) override {
+        mark("postServerSpecialize");
         if (env_ == nullptr) {
             LOGE("no JNIEnv in postServerSpecialize");
+            mark("postServer-no-env");
             return;
         }
         // Never dlclose the library here: Pine's trampolines live in it.

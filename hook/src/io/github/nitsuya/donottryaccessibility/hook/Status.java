@@ -1,15 +1,16 @@
 package io.github.nitsuya.donottryaccessibility.hook;
 
 import android.content.Context;
+import android.os.SystemClock;
 import android.provider.Settings;
 
 import org.json.JSONObject;
 
+import java.lang.reflect.Method;
+
 /**
- * Writes the "module is alive" marker that the manager app uses to detect an
- * active Zygisk hook.  The marker includes the current {@code boot_count}; the
- * app only considers the module active when the boot count matches, so a stale
- * value from a previous boot is ignored.
+ * Writes the "module is alive" marker used by the WebUI.  The marker contains
+ * the current {@code boot_count}; a stale value from a previous boot is ignored.
  */
 public final class Status {
 
@@ -33,5 +34,34 @@ public final class Status {
         } catch (Throwable t) {
             Logx.w("cannot write status", t);
         }
+    }
+
+    /**
+     * {@code BOOT_COUNT} is incremented by system_server after our early hook
+     * has already run, so the first heartbeat can contain the previous boot's
+     * number.  Write it again once {@code sys.boot_completed} is set; this is a
+     * one-shot wait, not a periodic poll.
+     */
+    public static void writeAfterBootCompleted() {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 240; i++) {
+                    try {
+                        Class<?> systemProperties = Class.forName("android.os.SystemProperties");
+                        Method get = systemProperties.getMethod("get", String.class);
+                        Object completed = get.invoke(null, "sys.boot_completed");
+                        if ("1".equals(completed)) {
+                            break;
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                    SystemClock.sleep(500);
+                }
+                write();
+            }
+        }, "dnta-status-boot");
+        thread.setDaemon(true);
+        thread.start();
     }
 }

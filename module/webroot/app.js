@@ -317,7 +317,13 @@ function renderList() {
   const list = $('package-list');
   const empty = $('list-empty');
   const loading = $('list-loading');
-  const items = visiblePackages();
+  const items = visiblePackages().sort((a, b) => {
+    // Checked apps stay pinned to the top so the unchecked ones are easy to find.
+    const ab = isBlocked(a.packageName) ? 1 : 0;
+    const bb = isBlocked(b.packageName) ? 1 : 0;
+    if (ab !== bb) return bb - ab;
+    return a.label.localeCompare(b.label, 'zh-CN');
+  });
 
   loading.hidden = true;
   list.innerHTML = '';

@@ -569,8 +569,14 @@ public final class AutoFill {
             return;
         }
         try {
-            Class<?> localServices = Class.forName("com.android.server.LocalServices");
-            Class<?> pmInternalClass = Class.forName("android.content.pm.PackageManagerInternal");
+            ClassLoader loader = Ctx.systemClassLoader();
+            if (loader == null) {
+                loader = AutoFill.class.getClassLoader();
+            }
+            Class<?> localServices = Class.forName(
+                    "com.android.server.LocalServices", false, loader);
+            Class<?> pmInternalClass = Class.forName(
+                    "android.content.pm.PackageManagerInternal", false, loader);
             Method getService = localServices.getDeclaredMethod("getService", Class.class);
             getService.setAccessible(true);
             Object pmInternal = getService.invoke(null, pmInternalClass);
@@ -578,7 +584,7 @@ public final class AutoFill {
                 return;
             }
             Class<?> observerClass = Class.forName(
-                    "android.content.pm.PackageManagerInternal$PackageListObserver");
+                    "android.content.pm.PackageManagerInternal$PackageListObserver", false, loader);
             Object observer = Proxy.newProxyInstance(
                     observerClass.getClassLoader(),
                     new Class<?>[]{observerClass},
