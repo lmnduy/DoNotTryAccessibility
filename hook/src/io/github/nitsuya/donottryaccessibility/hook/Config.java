@@ -1,6 +1,9 @@
 package io.github.nitsuya.donottryaccessibility.hook;
 
 import android.content.Context;
+import android.database.ContentObserver;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 
 import org.json.JSONArray;
@@ -21,8 +24,6 @@ import java.util.concurrent.Executors;
  */
 public final class Config {
 
-    private static final long REFRESH_INTERVAL_MS = 3000L;
-
     private static final Object LOCK = new Object();
 
     private static final ExecutorService WRITER = Executors.newSingleThreadExecutor(
@@ -36,7 +37,7 @@ public final class Config {
             });
 
     private static volatile Config sCached;
-    private static volatile boolean sRefresherStarted;
+    private static volatile boolean sObserverStarted;
 
     private static final Config DEFAULT = defaults();
 
@@ -66,32 +67,53 @@ public final class Config {
         this.allow = allow;
     }
 
-    public static void startRefresher() {
-        if (sRefresherStarted) {
+    /**
+     * Listen for configuration changes instead of polling.  The WebUI writes
+     * {@code Settings.Global} and the provider notifies this observer.
+     */
+    public static void startObserver() {
+        if (sObserverStarted) {
             return;
         }
-        sRefresherStarted = true;
+        sObserverStarted = true;
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                while (true) {
-                    try {
-                        if (Ctx.get() != null) {
-                            Config loaded = load();
-                            synchronized (LOCK) {
-                                sCached = loaded;
-                            }
-                            AutoFill.onConfig(loaded);
-                        }
-                    } catch (Throwable t) {
-                        Logx.w("config refresh failed", t);
-                    }
-                    android.os.SystemClock.sleep(REFRESH_INTERVAL_MS);
+                while (Ctx.get() == null) {
+                    android.os.SystemClock.sleep(100);
                 }
+                Context context = Ctx.get();
+                try {
+                    context.getContentResolver().registerContentObserver(
+                            Settings.Global.CONTENT_URI,
+                            true,
+                            new ContentObserver(new Handler(Looper.getMainLooper())) {
+                                @Override
+                                public void onChange(boolean selfChange) {
+                                    reload();
+                                }
+                            });
+                    Logx.i("config observer registered");
+                } catch (Throwable t) {
+                    Logx.e("cannot register config observer", t);
+                }
+                reload();
             }
-        }, "dnta-config-refresh");
+        }, "dnta-config-observer");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private static void reload() {
+        try {
+            Config loaded = load();
+            synchronized (LOCK) {
+                sCached = loaded;
+            }
+            AutoFill.onConfig(loaded);
+        } catch (Throwable t) {
+            Logx.w("config reload failed", t);
+        }
     }
 
     public static Config get() {

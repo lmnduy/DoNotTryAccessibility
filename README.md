@@ -50,7 +50,7 @@
 - 手动取消勾选的应用进入白名单，不会被自动加回；
 - 系统应用不参与；无法读取的用户资料保留旧基线，新发现的用户第一次扫描只做基线；
 - 关闭自动填充不会取消已有选择，但会清空基线；再次开启会重新取基线，关闭期间安装的应用不会被批量加入；
-- 后台约 60 秒检查一次，并监听 `ACTION_PACKAGE_ADDED` 提前触发。
+- 通过系统 `PackageManagerInternal.PackageListObserver` 和 `ACTION_PACKAGE_ADDED` 事件驱动，**不再定时轮询**；只有开启自动填充和开机各做一次基线/补偿扫描。
 
 实现见 `AutoFill.java`，语义对应 OhMyKeymint 的 `injector/src/auto_targets.rs`。
 
@@ -86,9 +86,9 @@ Bootstrap.start()
         │     • getEnabledAccessibilityServiceList
         │     • getInstalledAccessibilityServiceList
         │     • ContentProvider$Transport.call
-        ├─ Config.startRefresher()  → 每 3s 从 Settings.Global 拉配置
+        ├─ Config.startObserver()   → ContentObserver 监听 Settings.Global 变化
         ├─ AutoFill                  → 新安装包监听 + 补偿扫描
-        └─ Ctx 轮询拿到 system context → 写心跳、注册广播
+        └─ Ctx 启动时等待 system context → 写心跳、注册安装事件监听
 ```
 
 - **无 LSPosed / 无 Xposed API**：只使用 [Pine](https://github.com/canyie/pine) 做 ART 方法替换。
@@ -135,7 +135,7 @@ Bootstrap.start()
 2. 确认 Zygisk 已启用，重启；
 3. 打开模块的 **WebUI**（KernelSU/APatch 模块卡片的“打开”按钮）；
 4. 按需打开总开关 / 无障碍隐藏 / USB 调试隐藏；
-5. 第一次打开“自动填充”会记录基线；之后新安装的用户应用会自动加入（约 1 分钟检测一次）。
+5. 第一次打开“自动填充”会记录基线；之后系统安装回调会自动把新用户应用加入。
 
 ### 状态判断
 

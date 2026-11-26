@@ -92,7 +92,7 @@ public final class Ctx {
                 Logx.i("system context ready");
                 Status.write();
                 Config.get();
-                AutoFill.registerReceiver();
+                AutoFill.registerObservers();
             }
         }, "dnta-ctx");
         thread.setDaemon(true);

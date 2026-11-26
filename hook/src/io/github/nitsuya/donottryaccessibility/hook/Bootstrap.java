@@ -33,7 +33,7 @@ public final class Bootstrap {
             Pine.ensureInitialized();
             Logx.i("bootstrap: Pine initialized (hook mode " + Pine.getHookMode() + ")");
             HookInstaller.install();
-            Config.startRefresher();
+            Config.startObserver();
             Ctx.startPolling();
             Logx.i("bootstrap: done");
         } catch (Throwable t) {
