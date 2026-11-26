@@ -20,8 +20,7 @@ import top.canyie.pine.callback.MethodHook;
  *     disabled for the blocked caller;</li>
  *     <li>{@code ContentProvider.Transport.call}: rewrites the values returned
  *     by the settings provider ({@code accessibility_enabled},
- *     {@code enabled_accessibility_services}, {@code adb_enabled},
- *     {@code adb_wifi_enabled}, {@code development_settings_enabled}).</li>
+ *     {@code enabled_accessibility_services}).</li>
  * </ul>
  */
 public final class HookInstaller {
@@ -30,15 +29,11 @@ public final class HookInstaller {
 
     private static final String SETTINGS_AUTHORITY = "settings";
     private static final String GET_SECURE = "GET_secure";
-    private static final String GET_GLOBAL = "GET_global";
     private static final String VALUE = "value";
     private static final String GENERATION_INDEX = "_generation_index";
 
     private static final String KEY_ACCESSIBILITY_ENABLED = "accessibility_enabled";
     private static final String KEY_ACCESSIBILITY_SERVICES = "enabled_accessibility_services";
-    private static final String KEY_ADB_ENABLED = "adb_enabled";
-    private static final String KEY_ADB_WIFI_ENABLED = "adb_wifi_enabled";
-    private static final String KEY_DEVELOPMENT_SETTINGS = "development_settings_enabled";
 
     private HookInstaller() {
     }
@@ -86,7 +81,7 @@ public final class HookInstaller {
                     }
                     try {
                         int uid = Binder.getCallingUid();
-                        if (Policy.shouldBlock(uid, Policy.FEATURE_ACCESSIBILITY)) {
+                        if (Policy.shouldBlock(uid)) {
                             // AccessibilityManager keeps mIsEnabled == false because
                             // the service never calls back into the client.
                             callFrame.setResult(0L);
@@ -115,7 +110,7 @@ public final class HookInstaller {
                     }
                     try {
                         int uid = Binder.getCallingUid();
-                        if (Policy.shouldBlock(uid, Policy.FEATURE_ACCESSIBILITY)) {
+                        if (Policy.shouldBlock(uid)) {
                             callFrame.setResult(new ArrayList<Object>(0));
                         }
                     } catch (Throwable t) {
@@ -160,7 +155,7 @@ public final class HookInstaller {
                     }
                     try {
                         int uid = Binder.getCallingUid();
-                        if (Policy.shouldBlock(uid, Policy.FEATURE_ACCESSIBILITY)) {
+                        if (Policy.shouldBlock(uid)) {
                             Object empty = emptySlice();
                             if (empty != null) {
                                 callFrame.setResult(empty);
@@ -224,30 +219,19 @@ public final class HookInstaller {
                         if (!SETTINGS_AUTHORITY.equals(authority)) {
                             return;
                         }
-                        int feature;
+                        if (!GET_SECURE.equals(callMethod)) {
+                            return;
+                        }
                         String fakeValue;
-                        if (GET_SECURE.equals(callMethod)) {
-                            feature = Policy.FEATURE_ACCESSIBILITY;
-                            if (KEY_ACCESSIBILITY_SERVICES.equals(key)) {
-                                fakeValue = "";
-                            } else if (KEY_ACCESSIBILITY_ENABLED.equals(key)) {
-                                fakeValue = "0";
-                            } else {
-                                return;
-                            }
-                        } else if (GET_GLOBAL.equals(callMethod)) {
-                            feature = Policy.FEATURE_ADB;
-                            if (KEY_ADB_ENABLED.equals(key) || KEY_ADB_WIFI_ENABLED.equals(key)
-                                    || KEY_DEVELOPMENT_SETTINGS.equals(key)) {
-                                fakeValue = "0";
-                            } else {
-                                return;
-                            }
+                        if (KEY_ACCESSIBILITY_SERVICES.equals(key)) {
+                            fakeValue = "";
+                        } else if (KEY_ACCESSIBILITY_ENABLED.equals(key)) {
+                            fakeValue = "0";
                         } else {
                             return;
                         }
                         int uid = Binder.getCallingUid();
-                        if (!Policy.shouldBlock(uid, feature)) {
+                        if (!Policy.shouldBlock(uid)) {
                             return;
                         }
                         bundle.putString(VALUE, fakeValue);

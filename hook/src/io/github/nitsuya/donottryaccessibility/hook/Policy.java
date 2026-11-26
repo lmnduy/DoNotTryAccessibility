@@ -8,16 +8,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Per-package blocking policy.
+ * Per-package blocking policy for accessibility hiding.
  *
  * <p>Every check is performed server side: the caller of a binder transaction
- * is resolved to its package name through {@link Binder#getCallingUid()}, the
- * same mechanism the original LSPosed module used.</p>
+ * is resolved to its package name through {@link Binder#getCallingUid()}.</p>
  */
 public final class Policy {
-
-    public static final int FEATURE_ACCESSIBILITY = 1;
-    public static final int FEATURE_ADB = 2;
 
     private static final ThreadLocal<Boolean> IN_HOOK = new ThreadLocal<>();
 
@@ -43,15 +39,9 @@ public final class Policy {
         IN_HOOK.remove();
     }
 
-    public static boolean shouldBlock(int uid, int feature) {
+    public static boolean shouldBlock(int uid) {
         Config config = Config.get();
-        if (!config.enabled) {
-            return false;
-        }
-        if (feature == FEATURE_ACCESSIBILITY && !config.hideAccessibility) {
-            return false;
-        }
-        if (feature == FEATURE_ADB && !config.hideAdb) {
+        if (!config.enabled || !config.hideAccessibility) {
             return false;
         }
         if (uid == Process.SYSTEM_UID || uid == Process.ROOT_UID) {

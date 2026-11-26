@@ -43,7 +43,6 @@ public final class Config {
 
     public final boolean enabled;
     public final boolean hideAccessibility;
-    public final boolean hideAdb;
     public final boolean autoFill;
     /**
      * Per-user baseline of installed user packages.  The first scan for a user
@@ -55,11 +54,10 @@ public final class Config {
     public final Set<String> auto;
     public final Set<String> allow;
 
-    private Config(boolean enabled, boolean hideAccessibility, boolean hideAdb, boolean autoFill,
+    private Config(boolean enabled, boolean hideAccessibility, boolean autoFill,
                    JSONObject autoUsers, Set<String> block, Set<String> auto, Set<String> allow) {
         this.enabled = enabled;
         this.hideAccessibility = hideAccessibility;
-        this.hideAdb = hideAdb;
         this.autoFill = autoFill;
         this.autoUsers = autoUsers;
         this.block = block;
@@ -211,7 +209,6 @@ public final class Config {
             return new Config(
                     json.optBoolean("enabled", true),
                     json.optBoolean("hideAccessibility", true),
-                    json.optBoolean("hideAdb", true),
                     json.optBoolean("autoFill", false),
                     autoUsers == null ? new JSONObject() : new JSONObject(autoUsers.toString()),
                     readSet(json, "block"),
@@ -238,7 +235,7 @@ public final class Config {
     }
 
     private static Config defaults() {
-        return new Config(true, true, true, false, new JSONObject(),
+        return new Config(true, true, false, new JSONObject(),
                 Collections.emptySet(), Collections.emptySet(), Collections.emptySet());
     }
 }

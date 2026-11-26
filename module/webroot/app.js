@@ -63,7 +63,6 @@ function defaults() {
   return {
     enabled: true,
     hideAccessibility: true,
-    hideAdb: true,
     autoFill: false,
     autoUsers: {},
     block: [],
@@ -77,7 +76,6 @@ function normalize(raw) {
   return {
     enabled: c.enabled !== false,
     hideAccessibility: c.hideAccessibility !== false,
-    hideAdb: c.hideAdb !== false,
     autoFill: c.autoFill === true,
     autoUsers: (c.autoUsers && typeof c.autoUsers === 'object' && !Array.isArray(c.autoUsers)) ? c.autoUsers : {},
     block: Array.isArray(c.block) ? c.block.slice() : [],
@@ -413,10 +411,6 @@ function bind() {
     config.hideAccessibility = e.target.checked;
     scheduleSave();
   });
-  $('sw-adb').addEventListener('change', (e) => {
-    config.hideAdb = e.target.checked;
-    scheduleSave();
-  });
   $('sw-auto').addEventListener('change', (e) => {
     config.autoFill = e.target.checked;
     // A fresh enable records a new baseline; disabling also forgets it so that
@@ -478,7 +472,6 @@ async function refresh() {
   config = await readConfig();
   $('sw-enabled').checked = config.enabled;
   $('sw-accessibility').checked = config.hideAccessibility;
-  $('sw-adb').checked = config.hideAdb;
   $('sw-auto').checked = config.autoFill;
   renderAutoHint();
 

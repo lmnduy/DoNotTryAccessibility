@@ -69,38 +69,4 @@ public final class Bootstrap {
         }
     }
 
-    /** Called from {@code initApp()} for every injected user application. */
-    public static void startApp(final String packageName) {
-        try {
-            initPine();
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        android.content.Context context = AppCtx.awaitContext();
-                        if (context == null) {
-                            Logx.w("app context never appeared for " + packageName);
-                            return;
-                        }
-                        String policyPackage = context.getPackageName();
-                        if (policyPackage == null || policyPackage.isEmpty()) {
-                            policyPackage = packageName;
-                        }
-                        if (!AppHooks.isBlocked(context, policyPackage)) {
-                            Logx.i("app not blocked, skipping hooks: " + packageName);
-                            return;
-                        }
-                        initPine();
-                        AppHooks.install(policyPackage);
-                    } catch (Throwable t) {
-                        Logx.e("app bootstrap failed for " + packageName, t);
-                    }
-                }
-            }, "dnta-app-hooks");
-            thread.setDaemon(true);
-            thread.start();
-        } catch (Throwable t) {
-            Logx.e("app bootstrap failed for " + packageName, t);
-        }
-    }
 }
