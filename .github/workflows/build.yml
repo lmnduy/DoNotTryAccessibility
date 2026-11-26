@@ -41,11 +41,13 @@ jobs:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
           ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/26.1.10909125
 
-      - name: Upload artifact
+      - name: Upload flashable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DoNotTryAccessibility-zygisk
-          path: dist/*.zip
+          name: DoNotTryAccessibility-zygisk-flashable
+          # The artifact ZIP itself is a valid module ZIP: module.prop is at
+          # its root, so it can be flashed directly without extracting.
+          path: build/module/**
           if-no-files-found: error
 
       - name: Upload release asset

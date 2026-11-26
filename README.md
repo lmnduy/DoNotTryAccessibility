@@ -104,8 +104,8 @@ Bootstrap.start()
 仓库已包含 [`.github/workflows/build.yml`](.github/workflows/build.yml)：
 
 - push / PR / 手动 `workflow_dispatch` 时自动构建；
-- 产物：`DoNotTryAccessibility-zygisk-v2.0.0.zip`；
-- 打 `v*` tag 时自动创建 Release 并上传 zip。
+- artifact：`DoNotTryAccessibility-zygisk-flashable`，**下载后可直接刷入**（artifact 的 zip 根目录就是 `module.prop`，不要再解压套一层）；
+- 打 `v*` tag 时自动创建 Release 并上传 `DoNotTryAccessibility-zygisk-v2.0.0.zip`。
 
 在 GitHub 上 fork / 上传本目录后，Actions 会安装 `android-34`、`build-tools;35.0.0`、`ndk;26.1.10909125`、`cmake;3.22.1` 并运行 `build.sh`。
 
@@ -131,8 +131,10 @@ Bootstrap.start()
 
 ## 安装
 
-1. 在 KernelSU / APatch / Magisk 中刷入 `dist/DoNotTryAccessibility-zygisk-v2.0.0.zip`；
-2. 确认 Zygisk 已启用，重启；
+1. 刷入模块 zip（任选其一）：
+   - GitHub Actions 的 **`DoNotTryAccessibility-zygisk-flashable`** artifact：下载后**直接刷**，它的根目录就是 `module.prop`，不要再解压套一层；
+   - 本地/Release 的 `DoNotTryAccessibility-zygisk-v2.0.0.zip`；
+2. 确认 Zygisk（Zygisk Next）已启用，重启；
 3. 打开模块的 **WebUI**（KernelSU/APatch 模块卡片的“打开”按钮）；
 4. 按需打开总开关 / 无障碍隐藏 / USB 调试隐藏；
 5. 第一次打开“自动填充”会记录基线；之后系统安装回调会自动把新用户应用加入。
