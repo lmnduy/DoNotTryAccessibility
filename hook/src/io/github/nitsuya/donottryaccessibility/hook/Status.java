@@ -6,6 +6,8 @@ import android.provider.Settings;
 
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.lang.reflect.Method;
 
 /**
@@ -28,11 +30,30 @@ public final class Status {
             JSONObject json = new JSONObject();
             json.put("version", HookConfig.VERSION);
             json.put("boot", bootCount);
+            json.put("bootId", bootId());
             json.put("time", System.currentTimeMillis());
             Settings.Global.putString(context.getContentResolver(), HookConfig.KEY_STATUS, json.toString());
             Logx.i("status written: " + json);
         } catch (Throwable t) {
             Logx.w("cannot write status", t);
+        }
+    }
+
+    private static String bootId() {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new FileReader("/proc/sys/kernel/random/boot_id"));
+            String value = reader.readLine();
+            return value == null ? "" : value.trim();
+        } catch (Throwable t) {
+            return "";
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (Throwable ignored) {
+                }
+            }
         }
     }
 

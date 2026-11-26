@@ -14,29 +14,33 @@ public final class Bootstrap {
     private Bootstrap() {
     }
 
+    private static void initPine() {
+        Logx.i("bootstrap: initializing Pine");
+        PineConfig.debug = false;
+        PineConfig.debuggable = false;
+        PineConfig.antiChecks = false;
+        PineConfig.disableHooks = false;
+        // libpine.a is linked directly into the Zygisk library.
+        PineConfig.libLoader = new Pine.LibLoader() {
+            @Override
+            public void loadLib() {
+                // no-op
+            }
+        };
+        Pine.ensureInitialized();
+        Logx.i("bootstrap: Pine initialized (hook mode " + Pine.getHookMode() + ")");
+    }
+
     /**
-     * Called from {@code nativeInit()} in {@code libdnta.so}.  Pine is
-     * initialized immediately, but the hooks are installed only after
-     * system_server is ready: at {@code postServerSpecialize} time the settings
-     * provider and services.jar classes do not exist yet.
+     * Called from {@code nativeInit()} in {@code libdnta.so} inside
+     * system_server.  Pine is initialized immediately, but the hooks are
+     * installed only after system_server is ready: at
+     * {@code postServerSpecialize} time the settings provider and services.jar
+     * classes do not exist yet.
      */
     public static void start() {
         try {
-            Logx.i("bootstrap: initializing Pine");
-            PineConfig.debug = false;
-            PineConfig.debuggable = false;
-            PineConfig.antiChecks = false;
-            PineConfig.disableHooks = false;
-            // libpine.a is linked directly into the Zygisk library.
-            PineConfig.libLoader = new Pine.LibLoader() {
-                @Override
-                public void loadLib() {
-                    // no-op
-                }
-            };
-            Pine.ensureInitialized();
-            Logx.i("bootstrap: Pine initialized (hook mode " + Pine.getHookMode() + ")");
-
+            initPine();
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -62,6 +66,41 @@ public final class Bootstrap {
             thread.start();
         } catch (Throwable t) {
             Logx.e("bootstrap failed", t);
+        }
+    }
+
+    /** Called from {@code initApp()} for every injected user application. */
+    public static void startApp(final String packageName) {
+        try {
+            initPine();
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        android.content.Context context = AppCtx.awaitContext();
+                        if (context == null) {
+                            Logx.w("app context never appeared for " + packageName);
+                            return;
+                        }
+                        String policyPackage = context.getPackageName();
+                        if (policyPackage == null || policyPackage.isEmpty()) {
+                            policyPackage = packageName;
+                        }
+                        if (!AppHooks.isBlocked(context, policyPackage)) {
+                            Logx.i("app not blocked, skipping hooks: " + packageName);
+                            return;
+                        }
+                        initPine();
+                        AppHooks.install(policyPackage);
+                    } catch (Throwable t) {
+                        Logx.e("app bootstrap failed for " + packageName, t);
+                    }
+                }
+            }, "dnta-app-hooks");
+            thread.setDaemon(true);
+            thread.start();
+        } catch (Throwable t) {
+            Logx.e("app bootstrap failed for " + packageName, t);
         }
     }
 }

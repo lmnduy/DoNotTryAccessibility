@@ -170,7 +170,10 @@ async function readStatus() {
   }
   try {
     const json = JSON.parse(raw);
-    const active = Number(json.boot) === boot;
+    const bootId = (await exec('cat /proc/sys/kernel/random/boot_id')).stdout.trim();
+    const active = json.bootId
+      ? json.bootId === bootId
+      : Number(json.boot) === boot;
     status = {
       active,
       version: json.version || '?',

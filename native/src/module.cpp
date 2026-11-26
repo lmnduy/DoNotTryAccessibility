@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <string>
 #include <cstring>
 #include <cstdio>
 
@@ -40,6 +41,7 @@ constexpr const char *kBootstrapClass =
         "io.github.nitsuya.donottryaccessibility.hook.Bootstrap";
 
 bool gInjected = false;
+bool gAppInjected = false;
 jobject gDexLoader = nullptr;
 
 bool clearException(JNIEnv *env, const char *where) {
@@ -125,6 +127,82 @@ jobject createDexLoader(JNIEnv *env) {
     return loader;
 }
 
+bool initApp(JNIEnv *env, const zygisk::AppSpecializeArgs *args) {
+    if (gAppInjected) {
+        return true;
+    }
+    if (args == nullptr || args->nice_name == nullptr) {
+        return false;
+    }
+    int uid = args->uid;
+    int appId = uid % 100000;
+    // User applications only.  System apps (uid < 10000) and isolated
+    // processes (90000..99999) are left alone.
+    if (appId < 10000 || appId >= 90000) {
+        return false;
+    }
+    const char *rawName = env->GetStringUTFChars(args->nice_name, nullptr);
+    if (rawName == nullptr) {
+        return false;
+    }
+    std::string process(rawName);
+    env->ReleaseStringUTFChars(args->nice_name, rawName);
+    size_t colon = process.find(':');
+    if (colon != std::string::npos) {
+        process = process.substr(0, colon);
+    }
+    if (process.empty() || process == "android") {
+        return false;
+    }
+    // Never touch the home app or other boot-critical processes.  Hooking
+    // during their startup was observed to kill the launcher and block boot.
+    static const char *kSkip[] = {
+            "com.miui.home",
+            "com.android.systemui",
+            "com.android.phone",
+            "com.android.settings",
+            "com.google.android.gms",
+            "com.android.vending",
+            "com.miui.securitycenter",
+    };
+    for (const char *skip : kSkip) {
+        if (process == skip) {
+            return false;
+        }
+    }
+
+    jobject loader = createDexLoader(env);
+    if (loader == nullptr) {
+        return false;
+    }
+    jclass pineClass = loadClass(env, loader, kPineClass);
+    jclass rulerClass = loadClass(env, loader, kRulerClass);
+    if (pineClass == nullptr || rulerClass == nullptr) {
+        return false;
+    }
+    if (!register_Pine(env, pineClass) || !register_Ruler(env, rulerClass)) {
+        return false;
+    }
+    jclass bootstrapClass = loadClass(env, loader, kBootstrapClass);
+    if (bootstrapClass == nullptr) {
+        return false;
+    }
+    jmethodID startApp = env->GetStaticMethodID(bootstrapClass, "startApp",
+                                                "(Ljava/lang/String;)V");
+    if (startApp == nullptr) {
+        clearException(env, "GetStaticMethodID(Bootstrap.startApp)");
+        return false;
+    }
+    jstring packageName = env->NewStringUTF(process.c_str());
+    env->CallStaticVoidMethod(bootstrapClass, startApp, packageName);
+    env->DeleteLocalRef(packageName);
+    if (clearException(env, "Bootstrap.startApp")) {
+        return false;
+    }
+    gAppInjected = true;
+    LOGI("app hook installed for %s (uid %d)", process.c_str(), uid);
+    return true;
+}
 bool init(JNIEnv *env) {
     if (gInjected) {
         return true;
@@ -193,7 +271,9 @@ public:
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *args) override {
-        api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+        if (!initApp(env_, args)) {
+            api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+        }
     }
 
     void preServerSpecialize(zygisk::ServerSpecializeArgs *args) override {

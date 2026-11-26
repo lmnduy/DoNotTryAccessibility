@@ -37,6 +37,14 @@
 - `development_settings_enabled` → `"0"`
 
 因此读取 `Settings.Global.getInt(ADB_ENABLED)` 的检测会得到“未开启 USB 调试”。
+对于**被勾选的用户应用**，还会在应用进程内补齐 ADB 运行时表面（Duck Detector 等会交叉检查）：
+
+- `SystemProperties.get`：`init.svc.adbd` → `stopped`，`sys.usb.state` → `none`，`persist.sys.test_harness` / `service.adb.root` → `0`；
+- `Os.stat("/dev/socket/adbd")` → `ENOENT`，`File("/dev/socket").list()` 中移除 `adbd`；
+- USB sticky broadcast：`adb=false`；
+- Duck Detector 的 `AdbJdwpSocketBridge.nativeConnectErrno` → `ECONNREFUSED`。
+
+这些应用进程钩子只会注入到**已勾选/自动填充**的用户应用；启动器、系统 UI、电话、设置等启动关键进程不会注入。系统属性仍可能因 `getprop`/native 与反射源不一致而留下“属性需复核”类警告，内存扫描也可能看到 Hook 痕迹。
 
 ### 3. 自动填充（移植自 OhMyKeymint 的逻辑）
 
